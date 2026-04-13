@@ -1,21 +1,7 @@
-//
-//  AppDelegate.swift
-//  SwitchKey
-//
-//  Created by Jinyu Li on 2019/03/16.
-//  Copyright © 2019 Jinyu Li. All rights reserved.
-//
-
 import Cocoa
 import Carbon
+import SwiftUI
 import ServiceManagement
-
-extension Notification.Name {
-    static let killLauncher = Notification.Name("KillSwitchKeyLauncher")
-}
-
-private let itemCellIdentifier = NSUserInterfaceItemIdentifier("item-cell")
-private let editCellIdentifier = NSUserInterfaceItemIdentifier("edit-cell")
 
 private func applicationSwitchedCallback(_ axObserver: AXObserver, axElement: AXUIElement, notification: CFString, userData: UnsafeMutableRawPointer?) {
     if let userData = userData {
@@ -31,75 +17,344 @@ private func hasAccessibilityPermission() -> Bool {
 }
 
 private func askForAccessibilityPermission() {
-    let alert = NSAlert.init()
-    alert.messageText = "SwitchKey requires accessibility permissions."
-    alert.informativeText = "Please re-launch SwitchKey after you've granted permission in system preferences."
-    alert.addButton(withTitle: "Configure Accessibility Settings")
-    alert.alertStyle = NSAlert.Style.warning
+    let alert = NSAlert()
+    alert.messageText = "SwitchKey 需要辅助功能权限。"
+    alert.informativeText = "请在系统设置的“隐私与安全性 -> 辅助功能”中允许 SwitchKey 控制您的电脑。授权后请重新启动应用。"
+    alert.addButton(withTitle: "去设置")
+    alert.addButton(withTitle: "退出")
+    alert.alertStyle = .warning
 
     if alert.runModal() == .alertFirstButtonReturn {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else {
-            return
+        let urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+        if let url = URL(string: urlString) {
+            NSWorkspace.shared.open(url)
+            let bundleIds = ["com.apple.systemsettings", "com.apple.systempreferences"]
+            for bundleId in bundleIds {
+                if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first {
+                    app.activate(options: .activateIgnoringOtherApps)
+                    break
+                }
+            }
         }
-        NSWorkspace.shared.open(url)
-        NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.systempreferences").first?.activate(options: .activateIgnoringOtherApps)
+        NSApplication.shared.terminate(nil)
+    } else {
         NSApplication.shared.terminate(nil)
     }
 }
 
-@NSApplicationMain
-class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableViewDelegate {
-    @IBOutlet weak var statusBarMenu: NSMenu!
-    @IBOutlet weak var conditionTableView: TableView! {
-        didSet {
-            conditionTableView.appDelegate = self
-            conditionTableView.register(NSNib(nibNamed: "SwitchKey", bundle: nil), forIdentifier: itemCellIdentifier)
-            conditionTableView.register(NSNib(nibNamed: "SwitchKey", bundle: nil), forIdentifier: editCellIdentifier)
+// MARK: - Models and ViewModel
+
+struct ConditionItem: Identifiable {
+    let id = UUID()
+    var applicationIdentifier: String
+    var applicationName: String
+    var applicationIcon: NSImage
+    var inputSourceID: String
+    var inputSourceIcon: NSImage
+    var enabled: Bool
+}
+
+class SettingsViewModel: ObservableObject {
+    static let shared = SettingsViewModel()
+    
+    @Published var conditionItems: [ConditionItem] = []
+    @Published var launchAtStartup: Bool = SMAppService.mainApp.status == .enabled
+    @Published var selectableInputSources: [InputSourceInfo] = []
+    @Published var defaultInputSourceID: String = ""
+
+    func toggleLaunchAtStartup() {
+        do {
+            if launchAtStartup {
+                try SMAppService.mainApp.unregister()
+            } else {
+                try SMAppService.mainApp.register()
+            }
+            launchAtStartup = SMAppService.mainApp.status == .enabled
+        } catch {
+            print("Failed to change login item: \(error)")
+        }
+    }
+    
+    func addRunningAppIfNeeded(_ app: NSRunningApplication) {
+        let bundleId = app.bundleIdentifier ?? ""
+        guard !bundleId.isEmpty else { return }
+        
+        // Dispatch to main thread if not already, to update @Published properties
+        DispatchQueue.main.async {
+            if !self.conditionItems.contains(where: { $0.applicationIdentifier == bundleId }) {
+                let inputSource = InputSource.current()
+                let item = ConditionItem(
+                    applicationIdentifier: bundleId,
+                    applicationName: app.localizedName ?? "",
+                    applicationIcon: app.icon ?? NSImage(),
+                    inputSourceID: inputSource.inputSourceID(),
+                    inputSourceIcon: inputSource.icon(),
+                    enabled: false
+                )
+                self.conditionItems.append(item)
+                self.saveConditions()
+            }
+        }
+    }
+    
+    func addAppWithPicker() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        if panel.runModal() == .OK, let url = panel.url {
+            let bundle = Bundle(url: url)
+            let identifier = bundle?.bundleIdentifier ?? ""
+            guard !identifier.isEmpty else { return }
+
+            let name = FileManager.default.displayName(atPath: url.path)
+            let icon = NSWorkspace.shared.icon(forFile: url.path)
+            
+            if let index = conditionItems.firstIndex(where: { $0.applicationIdentifier == identifier }) {
+                conditionItems[index].inputSourceID = defaultInputSourceID
+                if let isrc = InputSource.with(defaultInputSourceID) {
+                    conditionItems[index].inputSourceIcon = isrc.icon()
+                }
+                saveConditions()
+                return
+            }
+
+            let item = ConditionItem(
+                applicationIdentifier: identifier,
+                applicationName: name,
+                applicationIcon: icon,
+                inputSourceID: defaultInputSourceID,
+                inputSourceIcon: InputSource.with(defaultInputSourceID)?.icon() ?? NSImage(),
+                enabled: true
+            )
+            
+            conditionItems.insert(item, at: 0)
+            saveConditions()
+        }
+    }
+    
+    func removeCondition(at offsets: IndexSet) {
+        conditionItems.remove(atOffsets: offsets)
+        saveConditions()
+    }
+    
+    func removeCondition(_ item: ConditionItem) {
+        if let index = conditionItems.firstIndex(where: { $0.id == item.id }) {
+            conditionItems.remove(at: index)
+            saveConditions()
         }
     }
 
+    func loadConditions() {
+        self.selectableInputSources = InputSource.allSelectable()
+
+        // 优先从持久化读取；若没有则用当前输入法兜底
+        let saved = UserDefaults.standard.string(forKey: "DefaultInputSourceID") ?? ""
+        if !saved.isEmpty && self.selectableInputSources.contains(where: { $0.id == saved }) {
+            self.defaultInputSourceID = saved
+        } else {
+            let currentID = InputSource.current().inputSourceID()
+            self.defaultInputSourceID = !currentID.isEmpty ? currentID : (self.selectableInputSources.first?.id ?? "")
+        }
+
+        if let conditions = UserDefaults.standard.array(forKey: "Conditions") as? [[String:Any]] {
+            var items: [ConditionItem] = []
+            for c in conditions {
+                if let inputSource = InputSource.with(c["InputSourceID"] as! String) {
+                    let appIconData = c["ApplicationIcon"] as? Data
+                    let icon = appIconData != nil ? NSImage(data: appIconData!) ?? NSImage() : NSImage()
+                    
+                    let item = ConditionItem(
+                        applicationIdentifier: c["ApplicationIdentifier"] as! String,
+                        applicationName: c["ApplicationName"] as! String,
+                        applicationIcon: icon,
+                        inputSourceID: inputSource.inputSourceID(),
+                        inputSourceIcon: inputSource.icon(),
+                        enabled: c["Enabled"] as! Bool
+                    )
+                    items.append(item)
+                }
+            }
+            self.conditionItems = items
+        }
+    }
+
+    func saveConditions() {
+        UserDefaults.standard.set(defaultInputSourceID, forKey: "DefaultInputSourceID")
+        var conditions: [[String: Any]] = []
+        for item in conditionItems {
+            var c:[String:Any] = [:]
+            c["ApplicationIdentifier"] = item.applicationIdentifier
+            c["InputSourceID"] = item.inputSourceID
+            c["Enabled"] = item.enabled
+            c["ApplicationName"] = item.applicationName
+            
+            if let cgRef = item.applicationIcon.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                let pngData = NSBitmapImageRep(cgImage: cgRef)
+                pngData.size = item.applicationIcon.size
+                if let data = pngData.representation(using: .png, properties: [:]) {
+                    c["ApplicationIcon"] = data
+                }
+            }
+            conditions.append(c)
+        }
+        UserDefaults.standard.set(conditions, forKey: "Conditions")
+    }
+}
+
+// MARK: - SwiftUI Views
+
+struct ContentView: View {
+    @StateObject private var viewModel = SettingsViewModel.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if viewModel.conditionItems.isEmpty {
+                Text("尚未添加任何应用映射")
+                    .foregroundColor(.secondary)
+                    .frame(height: 100)
+            } else {
+                List {
+                    ForEach($viewModel.conditionItems) { $item in
+                        HStack {
+                            Image(nsImage: item.applicationIcon)
+                                .resizable()
+                                .frame(width: 32, height: 32)
+                            
+                            Text(item.applicationName)
+                                .font(.body)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            Picker("", selection: Binding(
+                                get: { item.inputSourceID },
+                                set: { newID in
+                                    item.inputSourceID = newID
+                                    if let isrc = InputSource.with(newID) {
+                                        item.inputSourceIcon = isrc.icon()
+                                    }
+                                    viewModel.saveConditions()
+                                }
+                            )) {
+                                ForEach(viewModel.selectableInputSources) { source in
+                                    Text(source.name).tag(source.id)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 140)
+                            
+                            Toggle("", isOn: Binding(
+                                get: { item.enabled },
+                                set: { newValue in
+                                    item.enabled = newValue
+                                    viewModel.saveConditions()
+                                }
+                            ))
+                            .labelsHidden()
+                            
+                            Button(action: {
+                                viewModel.removeCondition(item)
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.leading, 8)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                .frame(height: 300)
+            }
+            
+            Divider()
+            
+            HStack {
+                Text("默认输入法")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+
+                Picker("", selection: Binding(
+                    get: { viewModel.defaultInputSourceID },
+                    set: { newVal in
+                        viewModel.defaultInputSourceID = newVal
+                        UserDefaults.standard.set(newVal, forKey: "DefaultInputSourceID")
+                    }
+                )) {
+                    ForEach(viewModel.selectableInputSources) { source in
+                        Text(source.name).tag(source.id)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 140)
+
+                Button(action: {
+                    viewModel.addAppWithPicker()
+                }) {
+                    Text("添加应用")
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                }
+                .buttonStyle(.borderless)
+                .background(Color.accentColor)
+                .foregroundColor(.white)
+                .cornerRadius(6)
+                
+                Spacer()
+                
+                Toggle("开机自启", isOn: Binding(
+                    get: { viewModel.launchAtStartup },
+                    set: { _ in viewModel.toggleLaunchAtStartup() }
+                ))
+                .toggleStyle(.checkbox)
+                
+                Button("退出") {
+                    NSApplication.shared.terminate(nil)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 8)
+            }
+            .padding()
+        }
+        .frame(width: 420)
+    }
+}
+
+// MARK: - App Entry Point
+
+@main
+struct SwitchKeyApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
+    var body: some Scene {
+        MenuBarExtra("SwitchKey", image: "StatusIcon") {
+            ContentView()
+        }
+        .menuBarExtraStyle(.window)
+    }
+}
+
+// MARK: - AppDelegate
+
+class AppDelegate: NSObject, NSApplicationDelegate {
     private var applicationObservers:[pid_t:AXObserver] = [:]
     private var currentPid:pid_t = getpid()
-
-    private var conditionItems: [ConditionItem] = []
-
-    private var statusBarItem: NSStatusItem!
-    private var launchAtStartupItem: NSMenuItem!
+    private var pendingSwitchTask: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         if !hasAccessibilityPermission() {
             askForAccessibilityPermission()
         }
 
-        loadConditions()
-
-        conditionTableView.dataSource = self
-        conditionTableView.delegate = self
-
-        statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        if let button = statusBarItem.button {
-            button.image = NSImage(named: "StatusIcon")
-        }
-        statusBarItem.menu = statusBarMenu
-        let statusBarMenuViewContainer = statusBarMenu.addItem(withTitle: "", action: nil, keyEquivalent: "")
-        statusBarMenuViewContainer.view = conditionTableView
-
-        statusBarMenu.addItem(NSMenuItem.separator())
-        launchAtStartupItem = statusBarMenu.addItem(withTitle: "Launch at login", action: #selector(menuDidLaunchAtStartupToggled), keyEquivalent: "")
-        launchAtStartupItem.state = LoginServiceKit.isExistLoginItems() ? .on : .off
-        launchAtStartupItem.target = self
-
-        statusBarMenu.addItem(withTitle: "Quit", action: #selector(menuDidQuitClicked), keyEquivalent: "").target = self
-
-        NotificationCenter.default.addObserver(self, selector: #selector(menuDidEndTracking(_:)), name: NSMenu.didEndTrackingNotification, object: nil)
+        SettingsViewModel.shared.loadConditions()
 
         let workspace = NSWorkspace.shared
-
         workspace.notificationCenter.addObserver(self, selector: #selector(applicationLaunched(_:)), name: NSWorkspace.didLaunchApplicationNotification, object: workspace)
-
         workspace.notificationCenter.addObserver(self, selector: #selector(applicationTerminated(_:)), name: NSWorkspace.didTerminateApplicationNotification, object: workspace)
 
         for application in workspace.runningApplications {
+            if application.activationPolicy == .regular {
+                SettingsViewModel.shared.addRunningAppIfNeeded(application)
+            }
             registerForAppSwitchNotification(application.processIdentifier)
         }
 
@@ -114,11 +369,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTab
     }
 
     fileprivate func applicationSwitched() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        pendingSwitchTask?.cancel()
+        pendingSwitchTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 100_000_000)
+            } catch {
+                return
+            }
+            
+            guard !Task.isCancelled else { return }
+            
             if let application = NSWorkspace.shared.frontmostApplication {
                 let switchedPid:pid_t = application.processIdentifier
                 if (switchedPid != self.currentPid && switchedPid != getpid()) {
-                    for condition in self.conditionItems {
+                    for condition in SettingsViewModel.shared.conditionItems {
                         if !condition.enabled {
                             continue
                         }
@@ -135,26 +399,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTab
         }
     }
 
-    @objc private func menuDidEndTracking(_ notification: Notification) {
-        conditionTableView.selectRowIndexes([], byExtendingSelection: false)
-    }
-
-    @objc private func menuDidLaunchAtStartupToggled() {
-        if launchAtStartupItem.state == .on {
-            launchAtStartupItem.state = .off
-            LoginServiceKit.removeLoginItems()
-        } else {
-            launchAtStartupItem.state = .on
-            LoginServiceKit.addLoginItems()
-        }
-    }
-
-    @objc private func menuDidQuitClicked() {
-        NSApplication.shared.terminate(nil)
-    }
-
     @objc private func applicationLaunched(_ notification: NSNotification) {
         let pid = notification.userInfo!["NSApplicationProcessIdentifier"] as! pid_t
+        if let app = NSRunningApplication(processIdentifier: pid), app.activationPolicy == .regular {
+            SettingsViewModel.shared.addRunningAppIfNeeded(app)
+        }
         registerForAppSwitchNotification(pid)
         applicationSwitched()
     }
@@ -172,7 +421,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTab
             if applicationObservers[pid] == nil {
                 var observer: AXObserver!
                 guard AXObserverCreate(pid, applicationSwitchedCallback, &observer) == .success else {
-                    fatalError("")
+                    return
                 }
                 CFRunLoopAddSource(RunLoop.current.getCFRunLoop(), AXObserverGetRunLoopSource(observer), .defaultMode)
 
@@ -182,194 +431,5 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTab
                 applicationObservers[pid] = observer
             }
         }
-    }
-
-    func loadConditions() {
-        if let conditions = UserDefaults.standard.array(forKey: "Conditions") as? [[String:Any]] {
-            for c in conditions {
-                let conditionItem = ConditionItem()
-                if let inputSource = InputSource.with(c["InputSourceID"] as! String) {
-                    conditionItem.applicationIdentifier = c["ApplicationIdentifier"] as! String
-                    conditionItem.inputSourceID = inputSource.inputSourceID();
-                    conditionItem.enabled = c["Enabled"] as! Bool
-                    conditionItem.inputSourceIcon = inputSource.icon()
-                    conditionItem.applicationName = c["ApplicationName"] as! String
-                    conditionItem.applicationIcon = NSImage(data: c["ApplicationIcon"] as! Data)!
-                    conditionItems.append(conditionItem)
-                }
-            }
-        }
-    }
-
-    func saveConditions() {
-        var conditions:[[String:Any]] = []
-        for conditionItem in conditionItems {
-            var c:[String:Any] = [:]
-            c["ApplicationIdentifier"] = conditionItem.applicationIdentifier
-            c["InputSourceID"] = conditionItem.inputSourceID
-            c["Enabled"] = conditionItem.enabled
-
-            c["ApplicationName"] = conditionItem.applicationName
-            let cgRef = conditionItem.applicationIcon.cgImage(forProposedRect: nil, context: nil, hints: nil)
-            let pngData = NSBitmapImageRep(cgImage: cgRef!)
-            pngData.size = conditionItem.applicationIcon.size
-            c["ApplicationIcon"] = pngData.representation(using: .png, properties: [:])
-
-            conditions.append(c)
-        }
-        UserDefaults.standard.set(conditions, forKey: "Conditions")
-    }
-
-    func addCondition() {
-        if let currentApplication = NSWorkspace.shared.frontmostApplication {
-            var newItemRow = 0;
-            defer {
-                conditionTableView.reloadData()
-                conditionTableView.selectRowIndexes([newItemRow], byExtendingSelection: false)
-                saveConditions()
-            }
-            let inputSource = InputSource.current()
-
-            if conditionItems.count > 0 {
-                for row in 1 ... conditionItems.count {
-                    let conditionItem = conditionItems[row - 1]
-                    if conditionItem.applicationIdentifier == currentApplication.bundleIdentifier {
-                        conditionItem.inputSourceID = inputSource.inputSourceID()
-                        conditionItem.inputSourceIcon = inputSource.icon()
-                        newItemRow = row;
-                        return
-                    }
-                }
-            }
-
-            let conditionItem = ConditionItem()
-
-            conditionItem.applicationIdentifier = currentApplication.bundleIdentifier ?? ""
-            conditionItem.applicationName = currentApplication.localizedName ?? ""
-            conditionItem.applicationIcon = currentApplication.icon ?? NSImage()
-
-            conditionItem.inputSourceID = inputSource.inputSourceID()
-            conditionItem.inputSourceIcon = inputSource.icon()
-
-            conditionItem.enabled = true
-
-            conditionItems.insert(conditionItem, at: 0)
-            newItemRow = 1;
-        }
-    }
-
-    func removeCondition(row: Int) {
-        if row > 0 {
-            conditionItems.remove(at: row - 1)
-            conditionTableView.reloadData()
-            saveConditions()
-        }
-    }
-
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        if row > 0 {
-            let item = conditionItems[row - 1]
-            let itemCell = conditionTableView.makeView(withIdentifier: itemCellIdentifier, owner: nil) as! ConditionCell
-            itemCell.appIcon.image = item.applicationIcon
-            itemCell.appName.stringValue = item.applicationName
-            
-            let icon = item.inputSourceIcon
-            itemCell.inputSourceButton.image = icon
-            itemCell.inputSourceButton.image?.isTemplate = icon.canTemplate()
-            
-            itemCell.conditionEnabled.state = item.enabled ? .on : .off
-            return itemCell
-        } else {
-            return conditionTableView.makeView(withIdentifier: editCellIdentifier, owner: nil)
-        }
-    }
-
-    func tableView(_ tableView: NSTableView, objectValueFor tableColumn: NSTableColumn?, row: Int) -> Any? {
-        if row > 0 {
-            return conditionItems[row - 1]
-        } else {
-            return self
-        }
-    }
-
-    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        if row > 0 {
-            return 64
-        } else {
-            return 24
-        }
-    }
-
-    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
-        let view = TableRowView()
-        view.highlight = row > 0
-        return view
-    }
-
-    func numberOfRows(in tableView: NSTableView) -> Int {
-        return conditionItems.count + 1
-    }
-}
-
-class TableView: NSTableView {
-    var appDelegate: AppDelegate! = nil
-
-    override func mouseDown(with event: NSEvent) {
-        let point = convert(event.locationInWindow, from: nil)
-        let rowAtPoint = row(at: point)
-        selectRowIndexes([rowAtPoint], byExtendingSelection: false)
-        super.mouseDown(with: event)
-    }
-
-    override func keyDown(with event: NSEvent) {
-        if event.type == NSEvent.EventType.keyDown && event.keyCode == kVK_Delete {
-            appDelegate.removeCondition(row: selectedRow)
-        } else {
-            super.keyDown(with: event)
-        }
-    }
-}
-
-class TableRowView: NSTableRowView {
-    var highlight: Bool = true
-
-    override func drawSelection(in dirtyRect: NSRect) {
-        if highlight {
-            NSColor.labelColor.withAlphaComponent(0.2).setFill()
-            self.bounds.fill()
-        }
-    }
-}
-
-class ConditionItem {
-    var applicationIdentifier: String = ""
-    var applicationName: String = ""
-    var applicationIcon: NSImage = NSImage()
-    var inputSourceID: String = ""
-    var inputSourceIcon: NSImage = NSImage()
-    var enabled: Bool = false
-}
-
-class ConditionCell: NSTableCellView {
-    @IBOutlet weak var appIcon: NSImageView!
-    @IBOutlet weak var appName: NSTextField!
-    @IBOutlet weak var conditionEnabled: NSButton!
-    @IBOutlet weak var inputSourceButton: NSButton!
-    @IBAction func inputSourceButtonClicked(_ sender: Any) {
-        let item = objectValue as! ConditionItem
-        if let inputSource = InputSource.with(item.inputSourceID) {
-            inputSource.activate()
-        }
-    }
-    @IBAction func toggleEnabled(_ sender: Any) {
-        let item = objectValue as! ConditionItem
-        item.enabled = conditionEnabled.state == .on;
-    }
-}
-
-class EditCell: NSTableCellView {
-    @IBAction func addItemClicked(_ sender: Any) {
-        let app = objectValue as! AppDelegate
-        app.addCondition()
     }
 }

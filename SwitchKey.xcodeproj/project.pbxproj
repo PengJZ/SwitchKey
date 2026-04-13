@@ -7,24 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		7115A91622631E6A00DD386A /* InputSource.m in Sources */ = {isa = PBXBuildFile; fileRef = 7115A91522631E6A00DD386A /* InputSource.m */; };
-		716404EE226A0FFB00E0F0A1 /* LoginServiceKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716404ED226A0FFB00E0F0A1 /* LoginServiceKit.swift */; };
+		7115A91622631E6A00DD386A /* InputSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7115A91522631E6A00DD386A /* InputSource.swift */; };
 		717050D4226204DE008A2686 /* SwitchKey.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 717050D3226204DE008A2686 /* SwitchKey.xcassets */; };
 		718A6EDF2285333700DB6B05 /* NSImage+extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718A6EDE2285333700DB6B05 /* NSImage+extensions.swift */; };
 		71FECF2E22610BE600C51FD7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71FECF2D22610BE600C51FD7 /* AppDelegate.swift */; };
-		71FECF3322610BE600C51FD7 /* SwitchKey.xib in Resources */ = {isa = PBXBuildFile; fileRef = 71FECF3122610BE600C51FD7 /* SwitchKey.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		7115A91322631E6A00DD386A /* SwitchKey-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "SwitchKey-Bridging-Header.h"; sourceTree = "<group>"; };
-		7115A91422631E6A00DD386A /* InputSource.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InputSource.h; sourceTree = "<group>"; };
-		7115A91522631E6A00DD386A /* InputSource.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = InputSource.m; sourceTree = "<group>"; };
-		716404ED226A0FFB00E0F0A1 /* LoginServiceKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginServiceKit.swift; sourceTree = "<group>"; };
+		7115A91522631E6A00DD386A /* InputSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSource.swift; sourceTree = "<group>"; };
 		717050D3226204DE008A2686 /* SwitchKey.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = SwitchKey.xcassets; sourceTree = "<group>"; };
 		718A6EDE2285333700DB6B05 /* NSImage+extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSImage+extensions.swift"; sourceTree = "<group>"; };
 		71FECF2A22610BE600C51FD7 /* SwitchKey.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwitchKey.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		71FECF2D22610BE600C51FD7 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		71FECF3222610BE600C51FD7 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/SwitchKey.xib; sourceTree = "<group>"; };
 		71FECF3422610BE600C51FD7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		71FECF3522610BE600C51FD7 /* SwitchKey.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SwitchKey.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -60,14 +54,10 @@
 			isa = PBXGroup;
 			children = (
 				71FECF2D22610BE600C51FD7 /* AppDelegate.swift */,
-				71FECF3122610BE600C51FD7 /* SwitchKey.xib */,
 				71FECF3422610BE600C51FD7 /* Info.plist */,
 				71FECF3522610BE600C51FD7 /* SwitchKey.entitlements */,
 				717050D3226204DE008A2686 /* SwitchKey.xcassets */,
-				7115A91422631E6A00DD386A /* InputSource.h */,
-				7115A91522631E6A00DD386A /* InputSource.m */,
-				7115A91322631E6A00DD386A /* SwitchKey-Bridging-Header.h */,
-				716404ED226A0FFB00E0F0A1 /* LoginServiceKit.swift */,
+				7115A91522631E6A00DD386A /* InputSource.swift */,
 				718A6EDE2285333700DB6B05 /* NSImage+extensions.swift */,
 			);
 			path = SwitchKey;
@@ -137,7 +127,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				71FECF3322610BE600C51FD7 /* SwitchKey.xib in Resources */,
 				717050D4226204DE008A2686 /* SwitchKey.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -150,23 +139,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				71FECF2E22610BE600C51FD7 /* AppDelegate.swift in Sources */,
-				716404EE226A0FFB00E0F0A1 /* LoginServiceKit.swift in Sources */,
 				718A6EDF2285333700DB6B05 /* NSImage+extensions.swift in Sources */,
-				7115A91622631E6A00DD386A /* InputSource.m in Sources */,
+				7115A91622631E6A00DD386A /* InputSource.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXVariantGroup section */
-		71FECF3122610BE600C51FD7 /* SwitchKey.xib */ = {
-			isa = PBXVariantGroup;
-			children = (
-				71FECF3222610BE600C51FD7 /* Base */,
-			);
-			name = SwitchKey.xib;
-			sourceTree = "<group>";
-		};
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
@@ -221,7 +201,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -276,7 +256,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -300,11 +280,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = itsuhane.tools.SwitchKey;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "SwitchKey/SwitchKey-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
@@ -325,11 +304,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = itsuhane.tools.SwitchKey;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = "SwitchKey/SwitchKey-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;

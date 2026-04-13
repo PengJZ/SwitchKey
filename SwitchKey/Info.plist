@@ -28,9 +28,5 @@
 	<true/>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2019 Jinyu Li. All rights reserved.</string>
-	<key>NSMainNibFile</key>
-	<string>SwitchKey</string>
-	<key>NSPrincipalClass</key>
-	<string>NSApplication</string>
 </dict>
 </plist>
