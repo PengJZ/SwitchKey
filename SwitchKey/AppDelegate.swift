@@ -211,66 +211,97 @@ struct ContentView: View {
         VStack(spacing: 0) {
             if viewModel.conditionItems.isEmpty {
                 Text("尚未添加任何应用映射")
+                    .font(.caption)
                     .foregroundColor(.secondary)
-                    .frame(height: 100)
+                    .frame(height: 60)
             } else {
-                List {
-                    ForEach($viewModel.conditionItems) { $item in
-                        HStack {
-                            Image(nsImage: item.applicationIcon)
-                                .resizable()
-                                .frame(width: 32, height: 32)
-                            
-                            Text(item.applicationName)
-                                .font(.body)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            Picker("", selection: Binding(
-                                get: { item.inputSourceID },
-                                set: { newID in
-                                    item.inputSourceID = newID
-                                    if let isrc = InputSource.with(newID) {
-                                        item.inputSourceIcon = isrc.icon()
+                // 列标题行
+                HStack(spacing: 4) {
+                    Color.clear.frame(width: 20)
+                    Text("程序名称")
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("输入法")
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                        .frame(width: 90, alignment: .leading)
+                    Color.clear.frame(width: 46)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color(NSColor.windowBackgroundColor))
+
+                Divider()
+
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach($viewModel.conditionItems) { $item in
+                            HStack(spacing: 4) {
+                                Image(nsImage: item.applicationIcon)
+                                    .resizable()
+                                    .frame(width: 18, height: 18)
+
+                                Text(item.applicationName)
+                                    .font(.system(size: 11))
+                                    .lineLimit(1)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Picker("", selection: Binding(
+                                    get: { item.inputSourceID },
+                                    set: { newID in
+                                        item.inputSourceID = newID
+                                        if let isrc = InputSource.with(newID) {
+                                            item.inputSourceIcon = isrc.icon()
+                                        }
+                                        viewModel.saveConditions()
                                     }
-                                    viewModel.saveConditions()
+                                )) {
+                                    ForEach(viewModel.selectableInputSources) { source in
+                                        Text(source.name).tag(source.id)
+                                    }
                                 }
-                            )) {
-                                ForEach(viewModel.selectableInputSources) { source in
-                                    Text(source.name).tag(source.id)
+                                .labelsHidden()
+                                .controlSize(.small)
+                                .frame(width: 90)
+
+                                Toggle("", isOn: Binding(
+                                    get: { item.enabled },
+                                    set: { newValue in
+                                        item.enabled = newValue
+                                        viewModel.saveConditions()
+                                    }
+                                ))
+                                .labelsHidden()
+                                .scaleEffect(0.8)
+                                .frame(width: 26)
+
+                                Button(action: {
+                                    viewModel.removeCondition(item)
+                                }) {
+                                    Image(systemName: "trash")
+                                        .font(.caption)
+                                        .foregroundColor(.red)
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .labelsHidden()
-                            .frame(width: 140)
-                            
-                            Toggle("", isOn: Binding(
-                                get: { item.enabled },
-                                set: { newValue in
-                                    item.enabled = newValue
-                                    viewModel.saveConditions()
-                                }
-                            ))
-                            .labelsHidden()
-                            
-                            Button(action: {
-                                viewModel.removeCondition(item)
-                            }) {
-                                Image(systemName: "trash")
-                                    .foregroundColor(.red)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.leading, 8)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 3)
+
+                            Divider()
+                                .padding(.horizontal, 10)
                         }
-                        .padding(.vertical, 4)
                     }
                 }
-                .frame(height: 300)
+                .frame(height: 260)
+                .background(Color(NSColor.controlBackgroundColor))
             }
-            
+
             Divider()
-            
+
             HStack {
                 Text("默认输入法")
-                    .font(.body)
+                    .font(.caption)
                     .foregroundColor(.secondary)
 
                 Picker("", selection: Binding(
@@ -285,37 +316,42 @@ struct ContentView: View {
                     }
                 }
                 .labelsHidden()
-                .frame(width: 140)
+                .controlSize(.small)
+                .frame(width: 90)
 
                 Button(action: {
                     viewModel.addAppWithPicker()
                 }) {
-                    Text("添加应用")
+                    Text("添加")
+                        .font(.caption)
                         .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 3)
                 }
                 .buttonStyle(.borderless)
                 .background(Color.accentColor)
                 .foregroundColor(.white)
-                .cornerRadius(6)
-                
+                .cornerRadius(5)
+
                 Spacer()
-                
+
                 Toggle("开机自启", isOn: Binding(
                     get: { viewModel.launchAtStartup },
                     set: { _ in viewModel.toggleLaunchAtStartup() }
                 ))
                 .toggleStyle(.checkbox)
-                
+                .font(.caption)
+
                 Button("退出") {
                     NSApplication.shared.terminate(nil)
                 }
+                .font(.caption)
                 .buttonStyle(.plain)
                 .padding(.leading, 8)
             }
-            .padding()
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
         }
-        .frame(width: 420)
+        .frame(width: 320)
     }
 }
 
