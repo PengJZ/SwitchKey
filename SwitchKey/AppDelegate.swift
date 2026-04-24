@@ -92,14 +92,15 @@ class SettingsViewModel: ObservableObject {
         // Dispatch to main thread if not already, to update @Published properties
         DispatchQueue.main.async {
             if !self.conditionItems.contains(where: { $0.applicationIdentifier == bundleId }) {
-                let inputSource = InputSource.current()
+                let defaultID = self.defaultInputSourceID
+                let inputSourceIcon = InputSource.with(defaultID)?.icon() ?? NSImage()
                 let item = ConditionItem(
                     applicationIdentifier: bundleId,
                     applicationName: app.localizedName ?? "",
                     applicationIcon: app.icon ?? NSImage(),
-                    inputSourceID: inputSource.inputSourceID(),
-                    inputSourceIcon: inputSource.icon(),
-                    enabled: false
+                    inputSourceID: defaultID,
+                    inputSourceIcon: inputSourceIcon,
+                    enabled: true
                 )
                 self.conditionItems.append(item)
                 self.saveConditions()
@@ -508,6 +509,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // 由顶层 C 回调转发，运行在主线程
     fileprivate func handleCGEvent(type: CGEventType, event: CGEvent) {
         switch type {
+
+        case .tapDisabledByTimeout, .tapDisabledByUserInput:
+            if let tap = shiftEventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return
 
         case .keyDown:
             // 任意普通键按下：记录到 pressedKeys；若 Shift 正在追踪则标记"有干扰键"
