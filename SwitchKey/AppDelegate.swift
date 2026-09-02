@@ -426,6 +426,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var previousShiftDown: Bool = false
     private var otherKeyEventDuringShift: Bool = false
     private var pressedKeys: Set<UInt16> = []
+    private var monitorTimer: Timer?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         AppDelegate.shared = self
@@ -491,9 +492,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         CGEvent.tapEnable(tap: tap, enable: true)
         shiftEventTap = tap
         shiftEventRunLoopSource = source
+
+        monitorTimer?.invalidate()
+        monitorTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
+            self?.checkAndRestartShiftMonitoringIfNeeded()
+        }
     }
 
     func stopShiftMonitoring() {
+        monitorTimer?.invalidate()
+        monitorTimer = nil
+
         if let tap = shiftEventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             if let source = shiftEventRunLoopSource {
@@ -504,6 +513,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         shiftPressTime = nil
         pressedKeys = []
+    }
+
+    private func checkAndRestartShiftMonitoringIfNeeded() {
+        guard let tap = shiftEventTap else { return }
+        if !CGEvent.tapIsEnabled(tap: tap) {
+            CGEvent.tapEnable(tap: tap, enable: true)
+            
+            if !CGEvent.tapIsEnabled(tap: tap) {
+                stopShiftMonitoring()
+                startShiftMonitoring()
+            }
+        }
     }
 
     // 由顶层 C 回调转发，运行在主线程
